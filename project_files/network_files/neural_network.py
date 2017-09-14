@@ -1,3 +1,5 @@
+from collections import namedtuple
+
 from project_files.network_files.network_layers import *
 
 
@@ -5,6 +7,8 @@ class NeuralNetwork:
     """
     Class used as neural network. To create instance of this class use :class:`NeuralNetworkDirector`.
     """
+    ParametersContainer = namedtuple("ParametersContainer",
+                                     ["alpha"])
 
     def __init__(self):
         self.__layer_list = list()
