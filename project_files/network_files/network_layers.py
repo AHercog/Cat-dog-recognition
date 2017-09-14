@@ -126,7 +126,7 @@ class FullyConnectedLayer(AbstractLayer):
         :param output_neurons_number: number of weights of data after this layer (without biases)
         :return: random initialized weights
         """
-        random_filters = numpy.random.rand(output_neurons_number, input_neurons_number)
+        random_filters = numpy.random.rand(output_neurons_number, input_neurons_number + 1)
         return random_filters
 
     def forward_propagation(self, input_data):
