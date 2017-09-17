@@ -1,6 +1,7 @@
 import numpy
 
 from project_files.image_parser_files.create_train_data import create_train_data
+from project_files.network_files.activation_functions import SigmoidFunction, ReluFunction
 from project_files.network_files.neural_network import NeuralNetworkDirector, NeuralNetworkBuilder, NeuralNetwork
 
 builder = NeuralNetworkBuilder()
@@ -11,7 +12,12 @@ network = director.construct(parameters)
 a, b = create_train_data("images\\tiny_set", 50)
 network.learn_network(a, b)
 
-# x = numpy.array([[[1, 2, 2], [3, 4, 2]], [[1, 2, 2], [3, 4, 2]]])
+
+
+# x = numpy.array([[[-1, 2, -2], [-3, 4, -2]], [[1, 2, 2], [3, 4, 2]]])
+# print(ReluFunction.calculate_gradient(x) * 1)
+# print(x[:])
+# print(numpy.concatenate(([999],numpy.reshape(x, (12)))))
 # print(numpy.amax(x[:, 0:2, 0:2], (1, 2)))
 # z = tuple(int(ti / 2) for ti in numpy.shape(x) )
 

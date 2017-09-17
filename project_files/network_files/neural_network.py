@@ -45,9 +45,9 @@ class NeuralNetwork:
 
         for layer in self.__layer_list:
             data_for_next_layer = layer.forward_propagation(data_for_next_layer)
-            # print(numpy.shape(data_for_next_layer))
+            print(numpy.shape(data_for_next_layer))
 
-        print(data_for_next_layer)
+            # print(data_for_next_layer)
 
     def __normalize_data(self, data_to_normalize):
         """
@@ -106,10 +106,11 @@ class NeuralNetworkBuilder(AbstractNeuralNetworkBuilder):
         :param input_map_size_of_network: size of map on the input of whole network
         :return: number of neurons in first fully connected layer
         """
-        map_size_after_first_pooling = numpy.math.floor((input_map_size_of_network - 4) / 2)
-        map_size_after_second_pooling = numpy.math.floor((map_size_after_first_pooling - 4) / 2)
-        map_size_after_third_pooling = numpy.math.floor((map_size_after_second_pooling - 4) / 2)
-        return map_size_after_third_pooling
+        map_size_after_first_pooling = numpy.math.ceil((input_map_size_of_network - 4) / 2)
+        map_size_after_second_pooling = numpy.math.ceil((map_size_after_first_pooling - 4) / 2)
+        map_size_after_third_pooling = numpy.math.ceil((map_size_after_second_pooling - 4) / 2)
+        fully_connected_size = 30 * map_size_after_third_pooling * map_size_after_third_pooling
+        return fully_connected_size
 
     def get_result(self):
         return self.__neural_network
@@ -127,7 +128,7 @@ class NeuralNetworkDirector:
 
     def construct(self, network_parameters):
         """
-        Construct neural network
+        Constructs neural network
 
         :param network_parameters: parameters of neural network
         :type network_parameters: NeuralNetwork.ParametersContainer
@@ -136,5 +137,4 @@ class NeuralNetworkDirector:
         """
         self.__builder.set_network_parameters(network_parameters)
         self.__builder.set_layers()
-        result = self.__builder.get_result()
-        return result
+        return self.__builder.get_result()
