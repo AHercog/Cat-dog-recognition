@@ -32,20 +32,55 @@ class AbstractLayer(ABC):
         raise NotImplementedError
 
 
-class ConvolutionalLayer(AbstractLayer):
+class ImageProcessingLayer(AbstractLayer):
     """
-    Layer that is doing convolution on given data.
+    Layer that is doing actions connected with image processing: convolution, RELU activation function and pooling.
     """
 
-    def __init__(self, input_feature_number, output_feature_number, filter_size):
+    def __init__(self, input_feature_number, output_feature_number, filter_size, pooling_window_size):
         """
         Initializes filters in this layer.
 
         :param input_feature_number: number of features of data before this layer
         :param output_feature_number: number of features of data after this layer
         :param filter_size: size of filter
+        :param pooling_window_size: size of pooling window
         """
         self.__filters = self.__random_initialize_filters(input_feature_number, output_feature_number, filter_size)
+        self.__pooling_window_size = pooling_window_size
+
+    def forward_propagation(self, input_data):
+        convolution_output = self.__do_convolution(input_data)
+        relu_output = self.__do_relu_activation(convolution_output)
+        pooling_output = self.__do_pooling(relu_output)
+        return pooling_output
+
+    def backward_propagation(self, input_data):
+        return input_data
+
+    def __do_convolution(self, input_data):
+        return input_data
+
+    @staticmethod
+    def __do_relu_activation(input_data):
+        output_data = (input_data > 0) * input_data
+        return output_data
+
+    def __do_pooling(self, input_data):
+        first_dimension, second_dimension, third_dimension = numpy.shape(input_data)
+        reduced_second_dimension = int(numpy.ceil(second_dimension / self.__pooling_window_size))
+        reduced_third_dimension = int(numpy.ceil(third_dimension / self.__pooling_window_size))
+        output_data_size = tuple([first_dimension, reduced_second_dimension, reduced_third_dimension])
+        output_data = numpy.zeros(output_data_size)
+
+        for i in range(0, reduced_second_dimension, 2):
+            for j in range(0, reduced_third_dimension, 2):
+                max_vector = numpy.amax(input_data[:,
+                                        i:i + self.__pooling_window_size,
+                                        j:j + self.__pooling_window_size], (1, 2))
+                output_data[:, i, j] = max_vector
+
+        return output_data
 
     @staticmethod
     def __random_initialize_filters(input_feature_number, output_feature_number, filter_size):
@@ -61,50 +96,11 @@ class ConvolutionalLayer(AbstractLayer):
         random_filters = numpy.random.rand(output_feature_number, input_feature_number, filter_size, filter_size)
         return random_filters
 
-    def forward_propagation(self, input_data):
-        return input_data
-
-    def backward_propagation(self, input_data):
-        return input_data
-
-
-class ReluLayer(AbstractLayer):
-    """
-    Layer that is applying relu function to given data.
-    """
-
-    def forward_propagation(self, input_data):
-        return input_data
-
-    def backward_propagation(self, input_data):
-        return input_data
-
-
-class PoolingLayer(AbstractLayer):
-    """
-    Layer that does pooling on given data.
-    """
-
-    def __init__(self, pooling_window_size):
-        """
-        Initializes pooling window size of this layer. Its size will be as follows:
-        pooling_window_size x pooling_window_size
-
-        :param pooling_window_size: size of pooling window
-        """
-        self.__pooling_window_size = pooling_window_size
-
-    def forward_propagation(self, input_data):
-        return input_data
-
-    def backward_propagation(self, input_data):
-        return input_data
-
 
 class FullyConnectedLayer(AbstractLayer):
     """
     Fully connected layer where every neuron from one of adjacent layers of data are connected is connected to every
-    neuron in second of adjacent layer of data.
+    neuron in second of adjacent layer of data. It does sigmoid activation function.
     """
 
     def __init__(self, input_neurons_number, output_neurons_number):
@@ -128,18 +124,6 @@ class FullyConnectedLayer(AbstractLayer):
         """
         random_filters = numpy.random.rand(output_neurons_number, input_neurons_number + 1)
         return random_filters
-
-    def forward_propagation(self, input_data):
-        return input_data
-
-    def backward_propagation(self, input_data):
-        return input_data
-
-
-class SigmoidLayer(AbstractLayer):
-    """
-    Layer that is applying sigmoid function to given data.
-    """
 
     def forward_propagation(self, input_data):
         return input_data
