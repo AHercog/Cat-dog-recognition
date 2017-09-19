@@ -2,6 +2,8 @@
 Module containing all types of layers used in neural network.
 """
 from abc import ABC, abstractmethod
+from collections import namedtuple
+from time import sleep
 
 import numpy
 
@@ -13,18 +15,23 @@ class AbstractLayer(ABC):
     Abstract base class for all types of layers in neural network.
     """
 
+    # sub-class used to pack data returned by forward propagation
+    ForwardPropagationData = namedtuple("ForwardPropagationData",
+                                        ["data_before_activation", "data_after_activation"])
+
     @abstractmethod
     def forward_propagation(self, input_data):
         """
-        Does forward pass through this layer and returns output.
+        Does forward pass through this layer and returns tuple of outputs: one before and one after activation function.
 
         :param input_data: data on which make forward pass
-        :return: output of this layer
+        :return: data before activation function, data after activation function
+        :rtype: AbstractLayer.ForwardPropagationData
         """
         raise NotImplementedError
 
     @abstractmethod
-    def backward_propagation(self, input_data):
+    def backward_propagation(self, input_data, forward_data):
         """
         Does backward pass through this layer and return output.
 
@@ -50,28 +57,30 @@ class ImageProcessingLayer(AbstractLayer):
         """
         self.__filters = self.__random_initialize_filters(input_feature_number, output_feature_number, filter_size)
         self.__pooling_window_size = pooling_window_size
+        self.__input_map_size = None
 
     def forward_propagation(self, input_data):
-        """
-        Does forward propagation for image processing layer and returns data before and data after activation function.
+        convolution_output = self.__do_forward_convolution(input_data)
+        pooling_output = self.__do_forward_pooling(convolution_output)
+        relu_output = self.__do_forward_relu_activation(pooling_output)
+        output_data = AbstractLayer.ForwardPropagationData(pooling_output, relu_output)
+        return output_data
 
-        :param input_data: data to do processing on
-        :return: data before activation function, data after activation function
-        :rtype: tuple
-        """
-        convolution_output = self.__do_convolution(input_data)
-        pooling_output = self.__do_pooling(convolution_output)
-        relu_output = self.__do_relu_activation(pooling_output)
-        return pooling_output, relu_output
+    def backward_propagation(self, input_data, forward_data):
+        if not self.__is_data_image_like(input_data):
+            input_data = self.__make_data_image_like(input_data)
 
-    def backward_propagation(self, input_data):
-        return input_data
+        convolution_output = self.__do_backward_convolution(input_data)
+        pooling_output = self.__do_backward_pooling(convolution_output)
+        relu_output = self.__do_backward_relu_activation(pooling_output, forward_data)
+        return relu_output
 
-    def __do_convolution(self, input_data):
+    def __do_forward_convolution(self, input_data):
         number_of_examples, input_map_count, input_map_size, input_map_size = numpy.shape(input_data)
         output_map_count, input_map_count, filter_size, filter_size = numpy.shape(self.__filters)
         output_map_size = input_map_size - filter_size + 1
         output_data = numpy.zeros((number_of_examples, output_map_count, output_map_size, output_map_size))
+        self.__input_map_size = input_map_size
 
         for actual_output_map in range(output_map_count):
             for actual_output_y in range(output_map_size):
@@ -86,12 +95,33 @@ class ImageProcessingLayer(AbstractLayer):
 
         return output_data
 
-    @staticmethod
-    def __do_relu_activation(input_data):
-        output_data = ReluFunction.calculate(input_data)
+    def __do_backward_convolution(self, input_data):
+        number_of_examples, input_map_count, input_map_size, input_map_size = numpy.shape(input_data)
+        input_map_count, output_map_count, filter_size, filter_size = numpy.shape(self.__filters)
+        output_map_size = self.__input_map_size
+        output_data = numpy.zeros((number_of_examples, output_map_count, output_map_size, output_map_size))
+
+        for actual_output_map in range(output_map_count):
+            for actual_filter_y in range(output_map_size):
+                for actual_filter_x in range(output_map_size):
+                    sum_of_elements = 0
+
+                    for actual_input_map in range(input_map_count):
+                        for i in range(filter_size):
+                            for j in range(filter_size):
+                                if 0 < actual_filter_y - i < input_map_size \
+                                        and 0 < actual_filter_x - j < input_map_size:
+                                    sum_of_elements += input_data[
+                                                       :, actual_input_map, actual_filter_y - i, actual_filter_x - j] \
+                                                       * self.__filters[
+                                                           actual_input_map, actual_output_map, i, j]
+
+                    sum_of_elements /= (input_map_count * filter_size * filter_size)
+                    output_data[:, actual_output_map, actual_filter_y, actual_filter_x] = sum_of_elements
+
         return output_data
 
-    def __do_pooling(self, input_data):
+    def __do_forward_pooling(self, input_data):
         """
         Does pooling by taking maximum value from every window of pre-defined size.
 
@@ -102,15 +132,35 @@ class ImageProcessingLayer(AbstractLayer):
         reduced_third_dimension = int(numpy.ceil(third_dimension / self.__pooling_window_size))
         reduced_fourth_dimension = int(numpy.ceil(fourth_dimension / self.__pooling_window_size))
         output_data_size = tuple([first_dimension, second_dimension, reduced_third_dimension, reduced_fourth_dimension])
+
         output_data = numpy.zeros(output_data_size)
+        chosen_units_map = numpy.zeros(numpy.shape(input_data))
 
         for height_index in range(0, reduced_third_dimension, 2):
             for width_index in range(0, reduced_fourth_dimension, 2):
                 max_vector = numpy.amax(input_data[:, :,
                                         height_index:height_index + self.__pooling_window_size,
                                         width_index:width_index + self.__pooling_window_size], (2, 3))
+                max_indices_vector = numpy.argmax(input_data[:, :,
+                                                  height_index:height_index + self.__pooling_window_size,
+                                                  width_index:width_index + self.__pooling_window_size], 3)
+
                 output_data[:, :, height_index, width_index] = max_vector
 
+        return output_data
+
+    def __do_backward_pooling(self, input_data):
+        return input_data
+
+    @staticmethod
+    def __do_forward_relu_activation(input_data):
+        output_data = ReluFunction.calculate(input_data)
+        return output_data
+
+    @staticmethod
+    def __do_backward_relu_activation(input_data, forward_data):
+        relu_gradient = ReluFunction.calculate_gradient(forward_data)
+        output_data = input_data * relu_gradient
         return output_data
 
     @staticmethod
@@ -126,6 +176,35 @@ class ImageProcessingLayer(AbstractLayer):
         """
         random_filters = numpy.random.rand(output_feature_number, input_feature_number, filter_size, filter_size) - 0.5
         return random_filters
+
+    @staticmethod
+    def __is_data_image_like(input_data):
+        """
+        Checks input data is image-like (ready for process for convolutional layer or not).
+
+        :param input_data: data to check if is image-like
+        :return: is data image-like
+        :rtype: bool
+        """
+        input_data_size_tuple = numpy.shape(input_data)
+        input_data_size = sum(1 for _ in input_data_size_tuple)
+
+        if input_data_size == 4:
+            return True
+        else:
+            return False
+
+    def __make_data_image_like(self, input_data):
+        """
+        Flattens data and adds bias unit so they can be processed by fully connected layer.
+
+        :param input_data: data to flatten
+        :return: flattened data
+        """
+        number_of_images, neuron_count = numpy.shape(input_data)
+        output_map_count, input_map_count, filter_size, filter_size = numpy.shape(self.__filters)
+        image_like_data = numpy.reshape(input_data, (number_of_images, output_map_count, 3, 3))
+        return image_like_data
 
 
 class FullyConnectedLayer(AbstractLayer):
@@ -147,30 +226,23 @@ class FullyConnectedLayer(AbstractLayer):
         if not self.__is_data_flattened(input_data):
             input_data = self.__flatten_data(input_data)
 
-        input_data_with_bias = self.__add_bias_unit(input_data)
-        fully_connected_output = self.__do_fully_connected(input_data_with_bias)
-        sigmoid_output = self.__do_sigmoid_activation(fully_connected_output)
+        fully_connected_output = self.__do_forward_fully_connected(input_data)
+        sigmoid_output = self.__do_forward_sigmoid_activation(fully_connected_output)
+        output_data = AbstractLayer.ForwardPropagationData(fully_connected_output, sigmoid_output)
+        return output_data
+
+    def backward_propagation(self, input_data, forward_data):
+        fully_connected_output = self.__do_backward_fully_connected(input_data)
+        sigmoid_output = self.__do_backward_sigmoid_activation(fully_connected_output, forward_data)
         return sigmoid_output
 
-    def backward_propagation(self, input_data):
-        return input_data
-
-    def __do_fully_connected(self, input_data):
+    def __do_forward_fully_connected(self, input_data):
         output_data = numpy.dot(input_data, numpy.transpose(self.__weights))
         return output_data
 
-    @staticmethod
-    def __add_bias_unit(input_data):
-        """
-        Adds bias unit to input data.
-
-        :param input_data: data to add bias unit to
-        :return: data with added bias unit
-        """
-        number_of_images, _ = numpy.shape(input_data)
-        bias_array = numpy.ones((number_of_images, 1))
-        data_with_bias = numpy.concatenate((bias_array, input_data), 1)
-        return data_with_bias
+    def __do_backward_fully_connected(self, input_data):
+        output_data = numpy.dot(input_data, self.__weights)
+        return output_data
 
     @staticmethod
     def __is_data_flattened(input_data):
@@ -189,7 +261,8 @@ class FullyConnectedLayer(AbstractLayer):
         else:
             return False
 
-    def __flatten_data(self, input_data):
+    @staticmethod
+    def __flatten_data(input_data):
         """
         Flattens data and adds bias unit so they can be processed by fully connected layer.
 
@@ -202,8 +275,18 @@ class FullyConnectedLayer(AbstractLayer):
         return flattened_data
 
     @staticmethod
-    def __do_sigmoid_activation(input_data):
+    def __do_forward_sigmoid_activation(input_data):
         output_data = SigmoidFunction.calculate(input_data)
+        return output_data
+
+    def __do_backward_sigmoid_activation(self, input_data, forward_data):
+        if not self.__is_data_flattened(forward_data):
+            flattened_forward_data = self.__flatten_data(forward_data)
+        else:
+            flattened_forward_data = forward_data
+
+        sigmoid_gradient = SigmoidFunction.calculate_gradient(flattened_forward_data)
+        output_data = input_data * sigmoid_gradient
         return output_data
 
     @staticmethod
@@ -216,5 +299,5 @@ class FullyConnectedLayer(AbstractLayer):
         :param output_neurons_number: number of weights of data after this layer (without biases)
         :return: random initialized weights
         """
-        random_weights = numpy.random.rand(output_neurons_number, input_neurons_number + 1) - 0.5
+        random_weights = numpy.random.rand(output_neurons_number, input_neurons_number) - 0.5
         return random_weights

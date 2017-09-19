@@ -7,8 +7,9 @@ class NeuralNetwork:
     """
     Class used as neural network. To create instance of this class use :class:`NeuralNetworkDirector`.
     """
-    ParametersContainer = namedtuple("ParametersContainer",
-                                     ["alpha"])
+
+    # mini class used to hold parameters used to create neural network
+    ParametersContainer = namedtuple("ParametersContainer", ["alpha"])
 
     def __init__(self):
         self.__layer_list = list()
@@ -32,24 +33,78 @@ class NeuralNetwork:
         """
         self.__network_parameters = parameters_to_set
 
-    def learn_network(self, data_to_learn, data_labels):
+    def learn_network(self, input_data, data_labels):
         """
         Learns this network based on input data.
 
-        :param data_to_learn: data to learn this network on, format of data is matrix of matrices of matrices:\n
+        :param input_data: data to learn this network on, format of data is matrix of matrices of matrices:\n
             `number of input images x width of single image x height of single image`
         :param data_labels: labels of data, format of this is one-dimensional matrix:\n
             `number of input images x 1`
         """
-        data_for_next_layer = self.__normalize_data(data_to_learn)
+        normalized_data = self.__normalize_data(input_data)
+        data_from_forward_propagation = self.__do_forward_propagation(normalized_data)
+        last_layer_output = data_from_forward_propagation[-1].data_after_activation
+        last_layer_deltas = last_layer_output - data_labels
+        delta_list = self.__do_backward_propagation(last_layer_deltas, data_from_forward_propagation)
+
+        # for i in data_from_forward_propagation:
+        #     print(numpy.shape(i.data_before_activation))
+        #     print(numpy.shape(i.data_after_activation))
+        #
+        # for i in delta_list:
+        #     print(numpy.shape(i))
+
+    def propagate_data_through_network(self, input_data):
+        data_for_next_layer = self.__normalize_data(input_data)
 
         for layer in self.__layer_list:
-            data_for_next_layer = layer.forward_propagation(data_for_next_layer)
-            print(numpy.shape(data_for_next_layer))
+            propagated_data = layer.forward_propagation(data_for_next_layer)
+            data_for_next_layer = propagated_data.data_after_activation
 
-            # print(data_for_next_layer)
+        return data_for_next_layer
 
-    def __normalize_data(self, data_to_normalize):
+    def __do_forward_propagation(self, input_data):
+        """
+        Does forward propagation pass for whole network.
+
+        :param input_data: data to make forward pass on
+        :return: list of results of every layer
+        :rtype: list of AbstractLayer.ForwardPropagationData
+        """
+        result_list = list()
+        data_for_next_layer = input_data
+
+        for layer in self.__layer_list:
+            propagated_data = layer.forward_propagation(data_for_next_layer)
+            data_for_next_layer = propagated_data.data_after_activation
+            result_list.append(propagated_data)
+            # print(numpy.shape(data_for_next_layer))
+
+        return result_list
+
+    def __do_backward_propagation(self, input_data, forward_data_list):
+        """
+        Does backward propagation pass for whole network.
+
+        :param input_data: data to make backward pass on
+        :param forward_data_list: data of every layer from forward propagation
+        :return: list deltas for every layer
+        """
+        result_list = list()
+        data_for_next_layer = input_data
+
+        for layer_index in range(len(self.__layer_list) - 1, 0, -1):
+            layer = self.__layer_list[layer_index]
+            data_for_next_layer = layer.backward_propagation(data_for_next_layer,
+                                                             forward_data_list[layer_index - 1].data_before_activation)
+            result_list.append(data_for_next_layer)
+
+        result_list.reverse()
+        return result_list
+
+    @staticmethod
+    def __normalize_data(data_to_normalize):
         """
         Normalizes data - transforms them so to range [0, 1].
 

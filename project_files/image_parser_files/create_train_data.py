@@ -17,5 +17,5 @@ def create_train_data(train_dir, img_size):
         img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
         img = cv2.resize(img, (img_size, img_size))
         training_data.append([np.array(img)])
-        training_data_labels.append(np.array(label))
+        training_data_labels.append([label])
     return training_data, training_data_labels
