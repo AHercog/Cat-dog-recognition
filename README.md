@@ -8,8 +8,8 @@ Project requires no installation besides few python packages that are easy to do
 
 How to run
 -
-First part of the project main script is located in project_files/scripts/run_network.py
-Second part is under TensorFlow directory
+1.First part of the project main script is located in project_files/scripts/run_network.py
+2.Second part is under TensorFlow directory
 
 Detailed description
 -
