@@ -13,8 +13,8 @@ network = director.construct(parameters)
 train_data_x, train_data_y = create_train_data("images\\train_set", 50)
 test_data_x, test_data_y = create_train_data("images\\test_set", 50)
 
-# network learning system isn't working 100% so it is commented
-# network.learn_network(a, b)
+# network learning system isn't working 100%
+network.learn_network(train_data_x, train_data_y)
 
 # propagate test and train data
 propagated_train_data = network.propagate_data_through_network(train_data_x)
